@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="CarRentalClassLibrary/CarRentalClassLibrary.csproj" />
+  <Project Path="CarRentalDBClass/CarRentalDBForm.csproj" />
+</Solution>
