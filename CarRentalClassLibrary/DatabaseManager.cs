@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.OleDb;
+using System.Diagnostics;
 using System.Text;
 
 namespace CarRentalClassLibrary
@@ -77,13 +78,23 @@ namespace CarRentalClassLibrary
             DataTable dataTable = new DataTable();
             try
             {
+                Debug.WriteLine($"\n========== SQL Query ==========");
+                Debug.WriteLine($"Query:\n{query}");
+
                 using (OleDbDataAdapter adapter = new OleDbDataAdapter(query, connection))
                 {
                     adapter.Fill(dataTable);
                 }
+
+                Debug.WriteLine($"✓ Success: {dataTable.Rows.Count} rows\n");
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Debug.WriteLine($"\n========== SQL ERROR ==========");
+                Debug.WriteLine($"✗ Error: {ex.Message}");
+                Debug.WriteLine($"Query:\n{query}");
+                Debug.WriteLine($"Stack: {ex.StackTrace}\n");
+
                 return null;
             }
             return dataTable;
@@ -117,6 +128,372 @@ namespace CarRentalClassLibrary
         public string GetConnectionString()
         {
             return connectionString;
+        }
+
+        /// <summary>
+        /// Получает список всех таблиц из БД
+        /// </summary>
+        public List<string> GetAllTableNames()
+        {
+            List<string> tableNames = new List<string>();
+
+            if (connection == null || connection.State != ConnectionState.Open)
+            {
+                return tableNames;
+            }
+
+            try
+            {
+                DataTable schemaTable = connection.GetOleDbSchemaTable(
+                    OleDbSchemaGuid.Tables,
+                    new object[] { null, null, null, "TABLE" });
+
+                if (schemaTable != null)
+                {
+                    foreach (DataRow row in schemaTable.Rows)
+                    {
+                        string tableName = row["TABLE_NAME"].ToString();
+                        if (!tableName.StartsWith("MSys"))
+                        {
+                            tableNames.Add(tableName);
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+
+            }
+
+            return tableNames;
+        }
+
+        /// <summary>
+        /// Форматированные данные таблицы
+        /// </summary>
+        public DataTable GetExtendedTable(string tableName)
+        {
+            if (string.IsNullOrEmpty(tableName))
+            {
+                return null;
+            }
+
+            string query = GetExtendedQuery(tableName);
+
+            if (string.IsNullOrEmpty(query))
+            {
+                // Если запрос не определён, возвращаем обычную таблицу
+                return GetTable(tableName);
+            }
+
+            return ExecuteQuery(query);
+        }
+
+        private string GetExtendedQuery(string tableName)
+        {
+            switch (tableName)
+            {
+                case "Договора проекта":
+                    return @"
+                SELECT 
+                    [Договора проекта].ID_Договора AS [ID],
+                    Клиенты.Фамилия_Клиента AS [Клиент],
+                    Автомобили.Номер_Автомобиля AS [Автомобиль],
+                    [Сотрудники проката].Фамилия_сотрудника AS [Сотрудник],
+                    [Договора проекта].Дата_Выдачи AS [Дата выдачи],
+                    [Договора проекта].Планируемая_Дата_Возврата AS [План возврат],
+                    [Договора проекта].Фактическая_Дата_Возврата AS [Факт возврат],
+                    [Договора проекта].Статус AS [Статус]
+                FROM (([Договора проекта]
+                INNER JOIN Клиенты ON [Договора проекта].ID_Клиента = Клиенты.ID_Клиента)
+                INNER JOIN Автомобили ON [Договора проекта].ID_Автомобиля = Автомобили.ID_Автомобиля)
+                INNER JOIN [Сотрудники проката] ON [Договора проекта].ID_Сотрудника = [Сотрудники проката].ID_Сотрудника
+                ORDER BY [Договора проекта].ID_Договора";
+
+                case "Автомобили":
+                    return @"
+                SELECT 
+                    Автомобили.ID_Автомобиля AS [ID],
+                    Автомобили.Номер_Автомобиля AS [Номер],
+                    Автомобили.Цвет AS [Цвет],
+                    Автомобили.Марка AS [Марка],
+                    Автомобили.Год_Выпуска AS [Год выпуска],
+                    Автомобили.Сумма_Страховки AS [Сумма страховки],
+                    [Страховые компании].Название AS [Страховая компания]
+                FROM Автомобили
+                LEFT JOIN [Страховые компании] ON Автомобили.ID_Страховой_Компании = [Страховые компании].ID_Страховой_Компании
+                ORDER BY Автомобили.ID_Автомобиля";
+
+
+                case "Пользователи":
+                    return @"
+                SELECT 
+                    Пользователи.ID_Пользователя AS [ID],
+                    Пользователи.Username AS [Логин],
+                    Роли.RoleName AS [Роль]
+                FROM Пользователи
+                INNER JOIN Роли ON Пользователи.ID_Роли = Роли.ID_Роли
+                ORDER BY Пользователи.ID_Пользователя";
+
+                case "Роли":
+                    return @"
+                SELECT 
+                    ID_Роли AS [ID],
+                    RoleName AS [Название роли]
+                FROM Роли
+                ORDER BY ID_Роли";
+
+                default:
+                    return null;
+            }
+        }
+
+        /// <summary>
+        /// Выполняет поиск по таблице с учётом расширенных запросов
+        /// </summary>
+        public DataTable SearchInTable(string tableName, string fieldName, string searchValue)
+        {
+            if (string.IsNullOrEmpty(tableName) || string.IsNullOrEmpty(fieldName) || string.IsNullOrEmpty(searchValue))
+            {
+                return null;
+            }
+
+            string extendedQuery = GetExtendedQuery(tableName);
+
+            if (!string.IsNullOrEmpty(extendedQuery))
+            {
+                // Для расширенных таблиц - формируем условие WHERE с правильными именами полей
+                string searchCondition = GetSearchConditionForExtendedTable(tableName, fieldName, searchValue);
+
+                if (!string.IsNullOrEmpty(searchCondition))
+                {
+                    // Вставляем WHERE перед ORDER BY
+                    string query;
+                    int orderByIndex = extendedQuery.LastIndexOf("ORDER BY", StringComparison.OrdinalIgnoreCase);
+
+                    if (orderByIndex >= 0)
+                    {
+                        query = extendedQuery.Substring(0, orderByIndex) +
+                                "WHERE " + searchCondition + "\n" +
+                                extendedQuery.Substring(orderByIndex);
+                    }
+                    else
+                    {
+                        query = extendedQuery + "\nWHERE " + searchCondition;
+                    }
+
+                    return ExecuteQuery(query);
+                }
+            }
+
+            // Для обычных таблиц
+            string simpleQuery = $"SELECT * FROM [{tableName}] WHERE [{fieldName}] LIKE '%{searchValue}%'";
+            return ExecuteQuery(simpleQuery);
+        }
+
+
+        /// <summary>
+        /// Возвращает условие WHERE для поиска в расширенных таблицах
+        /// </summary>
+        private string GetSearchConditionForExtendedTable(string tableName, string displayFieldName, string searchValue)
+        {
+            // Маппинг на полные имена полей
+            var fieldMapping = new Dictionary<string, Dictionary<string, string>>
+            {
+                ["Договора проекта"] = new Dictionary<string, string>
+                {
+                    ["ID"] = "[Договора проекта].ID_Договора",
+                    ["Клиент"] = "Клиенты.Фамилия_Клиента",
+                    ["Автомобиль"] = "Автомобили.Номер_Автомобиля",
+                    ["Сотрудник"] = "[Сотрудники проката].Фамилия_сотрудника",
+                    ["Дата выдачи"] = "[Договора проекта].Дата_Выдачи",
+                    ["План возврат"] = "[Договора проекта].Планируемая_Дата_Возврата",
+                    ["Факт возврат"] = "[Договора проекта].Фактическая_Дата_Возврата",
+                    ["Статус"] = "[Договора проекта].Статус"
+                },
+                ["Автомобили"] = new Dictionary<string, string>
+                {
+                    ["ID"] = "Автомобили.ID_Автомобиля",
+                    ["Номер"] = "Автомобили.Номер_Автомобиля",
+                    ["Цвет"] = "Автомобили.Цвет",
+                    ["Марка"] = "Автомобили.Марка",
+                    ["Год выпуска"] = "Автомобили.Год_Выпуска",
+                    ["Сумма страховки"] = "Автомобили.Сумма_Страховки",
+                    ["Страховая компания"] = "[Страховые компании].Название"
+                },
+                ["Пользователи"] = new Dictionary<string, string>
+                {
+                    ["ID"] = "Пользователи.ID_Пользователя",
+                    ["Логин"] = "Пользователи.Username",
+                    ["Роль"] = "Роли.RoleName"
+                },
+                ["Роли"] = new Dictionary<string, string>
+                {
+                    ["ID"] = "ID_Роли",
+                    ["Название роли"] = "RoleName"
+                }
+            };
+
+            if (fieldMapping.ContainsKey(tableName) && fieldMapping[tableName].ContainsKey(displayFieldName))
+            {
+                string fullFieldName = fieldMapping[tableName][displayFieldName];
+                return $"{fullFieldName} LIKE '%{searchValue.Replace("'", "''")}%'";
+            }
+
+            // Если маппинг не найден - используем имя как есть
+            return $"[{displayFieldName}] LIKE '%{searchValue.Replace("'", "''")}%'";
+        }
+
+        /// <summary>
+        /// Возвращает имя поля первичного ключа для указанной таблицы
+        /// </summary>
+        public string GetIdFieldName(string tableName)
+        {
+            switch (tableName)
+            {
+                case "Договора проекта":
+                    return "ID_Договора";
+                case "Автомобили":
+                    return "ID_Автомобиля";
+                case "Клиенты":
+                    return "ID_Клиента";
+                case "Сотрудники проката":
+                    return "ID_Сотрудника";
+                case "Страховые компании":
+                    return "ID_Страховой_Компании";
+                case "Пользователи":
+                    return "ID_Пользователя";
+                case "Роли":
+                    return "ID_Роли";
+                default:
+                    return "ID";
+            }
+        }
+
+        /// <summary>
+        /// Удаляет запись из таблицы по ID
+        /// </summary>
+        public bool DeleteRecord(string tableName, int id)
+        {
+            try
+            {
+                string idFieldName = GetIdFieldName(tableName);
+                string query = $"DELETE FROM [{tableName}] WHERE [{idFieldName}] = {id}";
+                int rowsAffected = ExecuteNonQuery(query);
+                return rowsAffected > 0;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Добавляет новую запись в таблицу
+        /// </summary>
+        public bool InsertRecord(string tableName, Dictionary<string, string> fieldValues)
+        {
+            try
+            {
+                if (fieldValues == null || fieldValues.Count == 0)
+                    return false;
+
+                List<string> columns = new List<string>();
+                List<string> values = new List<string>();
+
+                foreach (var kvp in fieldValues)
+                {
+                    columns.Add($"[{kvp.Key}]");
+
+                    // Проверяем, является ли значение числом или датой
+                    if (kvp.Value.StartsWith("#") && kvp.Value.EndsWith("#"))
+                    {
+                        // Дата
+                        values.Add(kvp.Value);
+                    }
+                    else if (int.TryParse(kvp.Value, out _) || double.TryParse(kvp.Value, out _))
+                    {
+                        // Число
+                        values.Add(kvp.Value);
+                    }
+                    else
+                    {
+                        // Строка - экранируем кавычки
+                        values.Add("'" + kvp.Value.Replace("'", "''") + "'");
+                    }
+                }
+
+                string query = $"INSERT INTO [{tableName}] ({string.Join(", ", columns)}) VALUES ({string.Join(", ", values)})";
+                int result = ExecuteNonQuery(query);
+                return result > 0;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Обновляет запись в таблице
+        /// </summary>
+        public bool UpdateRecord(string tableName, int id, Dictionary<string, string> fieldValues)
+        {
+            try
+            {
+                if (fieldValues == null || fieldValues.Count == 0)
+                    return false;
+
+                string idFieldName = GetIdFieldName(tableName);
+                List<string> setClauses = new List<string>();
+
+                foreach (var kvp in fieldValues)
+                {
+                    string value;
+
+                    if (kvp.Value.StartsWith("#") && kvp.Value.EndsWith("#"))
+                    {
+                        // Дата
+                        value = kvp.Value;
+                    }
+                    else if (int.TryParse(kvp.Value, out _) || double.TryParse(kvp.Value, out _))
+                    {
+                        // Число
+                        value = kvp.Value;
+                    }
+                    else
+                    {
+                        // Строка
+                        value = "'" + kvp.Value.Replace("'", "''") + "'";
+                    }
+
+                    setClauses.Add($"[{kvp.Key}] = {value}");
+                }
+
+                string query = $"UPDATE [{tableName}] SET {string.Join(", ", setClauses)} WHERE [{idFieldName}] = {id}";
+                int result = ExecuteNonQuery(query);
+                return result > 0;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Получает одну запись из таблицы по ID
+        /// </summary>
+        public DataTable GetRecordById(string tableName, int id)
+        {
+            try
+            {
+                string idFieldName = GetIdFieldName(tableName);
+                string query = $"SELECT * FROM [{tableName}] WHERE [{idFieldName}] = {id}";
+                return ExecuteQuery(query);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
     }
 }

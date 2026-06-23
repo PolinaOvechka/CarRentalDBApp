@@ -43,10 +43,6 @@ namespace CarRentalDBForm
                     "КРИТИЧЕСКАЯ ОШИБКА", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 this.Close();
             }
-            else
-            {
-                MessageBox.Show("Подключение к БД успешно установлено!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
         }
 
         // Обработка поля логина
@@ -168,9 +164,9 @@ namespace CarRentalDBForm
         private bool ValidateUser(string username, string passwordHash)
         {
 
-            string query = "SELECT u.ID, u.ID_Role, r.RoleName FROM Users u " +
-                              "INNER JOIN Roles r ON u.ID_Role = r.ID " +
-                              "WHERE u.Username = '" + username + "' AND u.PasswordHash = '" + passwordHash + "'";
+            string query = "SELECT u.ID_Пользователя, u.ID_Роли, r.RoleName FROM [Пользователи] u " +
+                          "INNER JOIN [Роли] r ON u.ID_Роли = r.ID_Роли " +
+                          "WHERE u.Username = '" + username + "' AND u.PasswordHash = '" + passwordHash + "'";
 
             DataTable result = dbManager.ExecuteQuery(query);
 
@@ -178,9 +174,9 @@ namespace CarRentalDBForm
             {
                 DataRow row = result.Rows[0];
 
-                if (row["ID"] != null && row["ID"] != DBNull.Value)
+                if (row["ID_Пользователя"] != null && row["ID_Пользователя"] != DBNull.Value)
                 {
-                    Session.CurrentUserId = Convert.ToInt32(row["ID"]);
+                    Session.CurrentUserId = Convert.ToInt32(row["ID_Пользователя"]);
                 }
 
                 Session.CurrentUser = username;
@@ -202,7 +198,7 @@ namespace CarRentalDBForm
 
         private UserRole GetRoleFromName(string roleName)
         {
-            switch (roleName.ToLower())
+            switch (roleName.Trim())
             {
                 case "Администратор":
                     return UserRole.Admin;
