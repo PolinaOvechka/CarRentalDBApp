@@ -139,7 +139,6 @@
             // 
             buttonReset.BackColor = Color.Transparent;
             buttonReset.Cursor = Cursors.Hand;
-            buttonReset.Enabled = false;
             buttonReset.FlatAppearance.BorderColor = Color.Gray;
             buttonReset.FlatAppearance.BorderSize = 2;
             buttonReset.FlatStyle = FlatStyle.Flat;
@@ -196,8 +195,8 @@
             buttonExport.Name = "buttonExport";
             buttonExport.Size = new Size(194, 40);
             buttonExport.TabIndex = 10;
-            buttonExport.Text = "Экспорт в Word";
-            buttonExport.UseVisualStyleBackColor = false;
+            buttonExport.Text = "Запросы";
+            buttonExport.UseVisualStyleBackColor = true;
             buttonExport.Click += buttonExport_Click;
             // 
             // textBoxSearch
