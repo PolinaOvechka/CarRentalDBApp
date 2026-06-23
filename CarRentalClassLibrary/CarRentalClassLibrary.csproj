@@ -14,4 +14,10 @@
     <PackageReference Include="System.Data.OleDb" Version="10.0.9" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="DataBase\Car_DB_practice.laccdb">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
