@@ -190,6 +190,7 @@
             Name = "LoginForm";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "Вход в систему";
+            Load += LoginForm_Load;
             panel1.ResumeLayout(false);
             panel1.PerformLayout();
             panelError.ResumeLayout(false);

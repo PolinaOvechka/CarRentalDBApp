@@ -9,7 +9,8 @@ namespace CarRentalClassLibrary
     public class DatabaseManager
     {
         private OleDbConnection connection;
-        private string connectionString = @"Provider=Microsoft.ACE.OLEDB.12.0;Data Source=|DataDirectory|\Car_DB_practice.accdb";
+        private string connectionString = @"Provider=Microsoft.ACE.OLEDB.12.0;Data Source=|DataDirectory|\DataBase\Car_DB_practice.accdb";
+        public string LastError { get; private set; } = string.Empty;
 
         public bool Connect()
         {
@@ -26,8 +27,9 @@ namespace CarRentalClassLibrary
                 }
                 return true;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                LastError = ex.Message;
                 return false;
             }
         }
@@ -110,6 +112,11 @@ namespace CarRentalClassLibrary
         public OleDbConnection GetConnection()
         {
             return connection;
+        }
+
+        public string GetConnectionString()
+        {
+            return connectionString;
         }
     }
 }

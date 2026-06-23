@@ -15,6 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="DataBase\Car_DB_practice.accdb">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="DataBase\Car_DB_practice.laccdb">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

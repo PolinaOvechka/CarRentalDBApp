@@ -36,8 +36,16 @@ namespace CarRentalDBForm
 
             if (!dbManager.Connect())
             {
-                MessageBox.Show("Не удалось подключиться к базе данных. Проверьте наличие файла и драйвера.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    "ОШИБКА: Не удалось подключиться к базе данных!\n\n" +
+                    "Текст ошибки: " + dbManager.LastError + "\n\n" +
+                    "Строка подключения: " + dbManager.GetConnectionString() + "\n\n",
+                    "КРИТИЧЕСКАЯ ОШИБКА", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 this.Close();
+            }
+            else
+            {
+                MessageBox.Show("Подключение к БД успешно установлено!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -89,6 +97,7 @@ namespace CarRentalDBForm
         /// </summary>
         private void buttonLogin_Click(object sender, EventArgs e)
         {
+
             string login = textBoxLogin.Text == LoginPlaceholder ? "" : textBoxLogin.Text;
             string password = textBoxPassword.Text == PasswordPlaceholder ? "" : textBoxPassword.Text;
 
@@ -158,35 +167,12 @@ namespace CarRentalDBForm
 
         private bool ValidateUser(string username, string passwordHash)
         {
-            if (dbManager == null)
-            {
-                ShowErrorMessage("Ошибка подключения к базе данных!");
-                return false;
-            }
 
             string query = "SELECT u.ID, u.ID_Role, r.RoleName FROM Users u " +
                               "INNER JOIN Roles r ON u.ID_Role = r.ID " +
                               "WHERE u.Username = '" + username + "' AND u.PasswordHash = '" + passwordHash + "'";
 
-
-            // ОТЛАДКА: покажем запрос
-            MessageBox.Show("Запрос:\n" + query + "\n\nХеш пароля:\n" + passwordHash, "Отладка");
-
             DataTable result = dbManager.ExecuteQuery(query);
-
-            // ОТЛАДКА: покажем результат
-            if (result == null)
-            {
-                MessageBox.Show("Результат запроса: NULL");
-            }
-            else if (result.Rows.Count == 0)
-            {
-                MessageBox.Show("Результат запроса: 0 строк найдено");
-            }
-            else
-            {
-                MessageBox.Show("Найдено строк: " + result.Rows.Count);
-            }
 
             if (result != null && result.Rows.Count > 0)
             {
