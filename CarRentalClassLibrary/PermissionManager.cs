@@ -19,12 +19,12 @@ namespace CarRentalClassLibrary
             "Страховые компании"
         };
 
-        // Таблицы, доступные только администратору
-        private static readonly List<string> AdminOnlyTables = new List<string>
-        {
-            "Пользователи",
-            "Роли"
-        };
+        //// Таблицы, доступные только администратору
+        //private static readonly List<string> AdminOnlyTables = new List<string>
+        //{
+        //    "Пользователи",
+        //    "Роли"
+        //};
 
         /// <summary>
         /// Проверяет, может ли пользователь просматривать данные (доступен всем)
@@ -80,23 +80,9 @@ namespace CarRentalClassLibrary
         public static bool IsTableAccessible(UserRole role, string tableName)
         {
             if (string.IsNullOrEmpty(tableName))
-            {
                 return false;
-            }
 
-            // Общие таблицы доступны всем
-            if (CommonTables.Contains(tableName))
-            {
-                return true;
-            }
-
-            // Специальные таблицы только для админа
-            if (AdminOnlyTables.Contains(tableName))
-            {
-                return role == UserRole.Admin;
-            }
-
-            return false;
+            return CommonTables.Contains(tableName);
         }
 
         /// <summary>
@@ -104,14 +90,16 @@ namespace CarRentalClassLibrary
         /// </summary>
         public static List<string> GetAvailableTables(UserRole role)
         {
-            List<string> tables = new List<string>(CommonTables);
+            return new List<string>(CommonTables);
 
-            if (role == UserRole.Admin)
-            {
-                tables.AddRange(AdminOnlyTables);
-            }
+            //List<string> tables = new List<string>(CommonTables);
 
-            return tables;
+            ////if (role == UserRole.Admin)
+            ////{
+            ////    tables.AddRange(AdminOnlyTables);
+            ////}
+
+            ////return tables;
         }
 
         public static bool IsDataGridViewReadOnly(UserRole role)

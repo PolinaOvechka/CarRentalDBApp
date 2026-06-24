@@ -405,29 +405,31 @@ namespace CarRentalClassLibrary
                 {
                     columns.Add($"[{kvp.Key}]");
 
-                    // Проверяем, является ли значение числом или датой
                     if (kvp.Value.StartsWith("#") && kvp.Value.EndsWith("#"))
                     {
                         // Дата
                         values.Add(kvp.Value);
                     }
-                    else if (int.TryParse(kvp.Value, out _) || double.TryParse(kvp.Value, out _))
+                    else if (IsNumericValue(kvp.Value))
                     {
-                        // Число
+                        // Число (без пробелов)
                         values.Add(kvp.Value);
                     }
                     else
                     {
                         // Строка - экранируем кавычки
-                        values.Add("'" + kvp.Value.Replace("'", "''") + "'");
+                        string escapedValue = kvp.Value.Replace("'", "''");
+                        values.Add("'" + escapedValue + "'");
                     }
                 }
 
                 string query = $"INSERT INTO [{tableName}] ({string.Join(", ", columns)}) VALUES ({string.Join(", ", values)})";
+
                 int result = ExecuteNonQuery(query);
+
                 return result > 0;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 return false;
             }
@@ -455,14 +457,14 @@ namespace CarRentalClassLibrary
                         // Дата
                         value = kvp.Value;
                     }
-                    else if (int.TryParse(kvp.Value, out _) || double.TryParse(kvp.Value, out _))
+                    else if (IsNumericValue(kvp.Value))
                     {
-                        // Число
+                        // Число (без пробелов и других символов)
                         value = kvp.Value;
                     }
                     else
                     {
-                        // Строка
+                        // Строка - экранируем кавычки
                         value = "'" + kvp.Value.Replace("'", "''") + "'";
                     }
 
@@ -470,13 +472,31 @@ namespace CarRentalClassLibrary
                 }
 
                 string query = $"UPDATE [{tableName}] SET {string.Join(", ", setClauses)} WHERE [{idFieldName}] = {id}";
+
                 int result = ExecuteNonQuery(query);
+
                 return result > 0;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Проверяет, является ли значение числом (без пробелов и других символов)
+        /// </summary>
+        private bool IsNumericValue(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            // Если содержит пробелы - это не число
+            if (value.Contains(" "))
+                return false;
+
+            // Проверяем, можно ли преобразовать в число
+            return int.TryParse(value, out _) || double.TryParse(value, out _);
         }
 
         /// <summary>

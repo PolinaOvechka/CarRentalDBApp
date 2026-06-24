@@ -285,17 +285,38 @@ namespace CarRentalDBForm
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-
-            MessageBox.Show("Форма добавления данных (будет реализована)", "Информация",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            
+            RecordForm addForm = new RecordForm(dbManager, currentTableName, RecordFormMode.Add);
+            if (addForm.ShowDialog() == DialogResult.OK)
+            {
+                LoadTable(currentTableName);
+            }
         }
 
         private void buttonEdit_Click(object sender, EventArgs e)
         {
-            if (dataGridViewMain.CurrentRow == null)
+            // Проверяем, что есть данные в таблице
+            if (dataGridViewMain.Rows.Count == 0)
             {
-                MessageBox.Show("Выберите запись для редактирования!", "Предупреждение",
+                MessageBox.Show("Таблица пуста — нечего редактировать!", "Предупреждение",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Проверяем, что выбрана строка с данными (не пустая строка добавления)
+            if (dataGridViewMain.CurrentRow == null || dataGridViewMain.CurrentRow.IsNewRow)
+            {
+                MessageBox.Show("Сначала выберите запись в таблице для редактирования!", "Предупреждение",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Проверяем, что у выбранной строки есть ID
+            object idValue = dataGridViewMain.CurrentRow.Cells[0].Value;
+            if (idValue == null || idValue == DBNull.Value)
+            {
+                MessageBox.Show("Не удалось получить ID выбранной записи!", "Ошибка",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
@@ -306,8 +327,13 @@ namespace CarRentalDBForm
                 return;
             }
 
-            MessageBox.Show("Форма редактирования (будет реализована)", "Информация",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            int recordId = Convert.ToInt32(idValue);
+
+            RecordForm editForm = new RecordForm(dbManager, currentTableName, RecordFormMode.Edit, recordId);
+            if (editForm.ShowDialog() == DialogResult.OK)
+            {
+                LoadTable(currentTableName);
+            }
         }
 
         private void buttonDelete_Click(object sender, EventArgs e)
@@ -371,34 +397,15 @@ namespace CarRentalDBForm
 
         private void buttonExport_Click(object sender, EventArgs e)
         {
-            if (dataGridViewMain.Rows.Count == 0)
-            {
-                MessageBox.Show("Нет данных для экспорта!", "Предупреждение",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
             if (!PermissionManager.CanExport(Session.CurrentRole))
             {
-                MessageBox.Show("У вас нет прав для экспорта!", "Ошибка доступа",
+                MessageBox.Show("У вас нет прав для просмотра запросов!", "Ошибка доступа",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            ExportToWord();
-        }
-
-        private void ExportToWord()
-        {
-            try
-            {
-                MessageBox.Show("Экспорт в Word (будет реализован)", "Информация",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Ошибка при экспорте: {ex.Message}", "Ошибка",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            QueryForm queryForm = new QueryForm(dbManager);
+            queryForm.ShowDialog();
         }
 
         // ================= ВЕРХНЕЕ МЕНЮ =================
