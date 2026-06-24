@@ -337,5 +337,10 @@ namespace CarRentalDBForm
 
             e.HasMorePages = false;
         }
+
+        private void buttonExit_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
     }
 }

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Drawing;
 using System.Security.Cryptography;
 using System.Text;
@@ -128,11 +129,12 @@ namespace CarRentalDBForm
                 return;
             }
 
-            //System.Diagnostics.Debug.WriteLine($"\n=== LoadTableStructure ===");
-            //System.Diagnostics.Debug.WriteLine($"Table: {tableName}");
-            //System.Diagnostics.Debug.WriteLine($"Columns: {tableStructure.Columns.Count}");
+            System.Diagnostics.Debug.WriteLine($"\n=== LoadTableStructure ===");
+            System.Diagnostics.Debug.WriteLine($"Table: {tableName}");
+            System.Diagnostics.Debug.WriteLine($"Columns: {tableStructure.Columns.Count}");
 
             panelFields.Controls.Clear();
+            inputControls.Clear();
 
             int yPos = 20;
             int fieldWidth = Math.Max(350, panelFields.ClientSize.Width - 40);
@@ -140,23 +142,16 @@ namespace CarRentalDBForm
             int controlHeight = 28;
             int spacing = 20;
 
-            bool isFirstColumn = true; // Флаг первого поля
+            bool isFirstColumn = true;
 
             foreach (DataColumn column in tableStructure.Columns)
             {
-                // Проверяем, является ли это первичным ключом
                 if (IsIdField(column.ColumnName, isFirstColumn))
                 {
-                    //System.Diagnostics.Debug.WriteLine($"  Пропускаем первичный ключ: {column.ColumnName}");
                     isFirstColumn = false;
                     continue;
                 }
-
-                isFirstColumn = false; // После первого поля сбрасываем флаг
-
-                //System.Diagnostics.Debug.WriteLine($"\n  Поле: {column.ColumnName}");
-                //System.Diagnostics.Debug.WriteLine($"  Тип: {column.DataType.Name}");
-                //System.Diagnostics.Debug.WriteLine($"  Foreign Key: {foreignKeys.ContainsKey(column.ColumnName)}");
+                isFirstColumn = false;
 
                 // Заголовок поля
                 Label lbl = new Label
@@ -177,10 +172,52 @@ namespace CarRentalDBForm
                 inputControl.Location = new Point(20, yPos + labelHeight + 5);
                 inputControl.Size = new Size(fieldWidth - 40, controlHeight);
                 inputControl.Tag = column.ColumnName;
+
+                // ВАЖНО: СНАЧАЛА добавляем в панель!
                 panelFields.Controls.Add(inputControl);
+
+                // ПОТОМ инициализируем ComboBox (если это ComboBox)
+                if (inputControl is ComboBox cmb)
+                {
+                    InitializeComboBoxData(cmb, column.ColumnName);
+                }
+
                 inputControls[column.ColumnName] = inputControl;
 
                 yPos += labelHeight + controlHeight + spacing;
+            }
+            if (inputControls.ContainsKey("Фактическая_Дата_Возврата"))
+            {
+                var factReturnPicker = inputControls["Фактическая_Дата_Возврата"] as DateTimePicker;
+                if (factReturnPicker != null)
+                {
+                    factReturnPicker.ValueChanged += FactReturnPicker_ValueChanged;
+                }
+            }
+
+            System.Diagnostics.Debug.WriteLine($"Total controls created: {inputControls.Count}");
+            System.Diagnostics.Debug.WriteLine("========================\n");
+        }
+
+        /// <summary>
+        /// Обработчик изменения фактической даты возврата - автоматически меняет статус
+        /// </summary>
+        private void FactReturnPicker_ValueChanged(object sender, EventArgs e)
+        {
+            if (inputControls.ContainsKey("Статус") && inputControls["Статус"] is ComboBox statusComboBox)
+            {
+                var factReturnPicker = sender as DateTimePicker;
+
+                if (factReturnPicker.Checked && factReturnPicker.Value != null)
+                {
+                    // Если назначена фактическая дата - статус "Завершен"
+                    statusComboBox.Text = "Завершен";
+                }
+                else
+                {
+                    // Если дата убрана - статус "Активен"
+                    statusComboBox.Text = "Активен";
+                }
             }
         }
 
@@ -190,6 +227,19 @@ namespace CarRentalDBForm
         private Control CreateInputControl(DataColumn column)
         {
             string columnName = column.ColumnName;
+
+            // Специальная обработка для поля Статус
+            if (columnName == "Статус")
+            {
+                return CreateStatusComboBox();
+            }
+
+            // Проверяем, нужно ли применить маску
+            string mask = GetMaskForField(columnName);
+            if (!string.IsNullOrEmpty(mask))
+            {
+                return CreateMaskedTextBox(mask);
+            }
 
             // Проверяем является ли поле внешним ключом
             if (foreignKeys.ContainsKey(columnName))
@@ -226,6 +276,9 @@ namespace CarRentalDBForm
 
         // ================= ЗАГРУЗКА ДАННЫХ ЗАПИСИ =================
 
+        /// <summary>
+        /// Загружает данные существующей записи в поля формы (для режима редактирования)
+        /// </summary>
         /// <summary>
         /// Загружает данные существующей записи в поля формы (для режима редактирования)
         /// </summary>
@@ -269,22 +322,76 @@ namespace CarRentalDBForm
                 }
                 else if (control is ComboBox cmb)
                 {
-                    if (currentValue != DBNull.Value)
+                    // Проверяем, это ComboBox для статуса или для внешнего ключа
+                    if (column.ColumnName == "Статус")
                     {
-                        try
+                        // Для статуса просто устанавливаем текст
+                        if (currentValue != DBNull.Value)
                         {
-                            cmb.SelectedValue = Convert.ToInt32(currentValue);
+                            cmb.Text = currentValue.ToString();
                         }
-                        catch (Exception ex)
+                    }
+                    else
+                    {
+                        // Для внешних ключей
+                        if (currentValue != DBNull.Value)
                         {
+                            try
+                            {
+                                int targetId = Convert.ToInt32(currentValue);
+
+                                System.Diagnostics.Debug.WriteLine($"  ComboBox for {column.ColumnName}:");
+                                System.Diagnostics.Debug.WriteLine($"    Items count: {cmb.Items.Count}");
+                                System.Diagnostics.Debug.WriteLine($"    Target ID: {targetId}");
+
+                                bool found = false;
+                                for (int i = 0; i < cmb.Items.Count; i++)
+                                {
+                                    if (cmb.Items[i] is DataRowView drv)
+                                    {
+                                        object val = drv[cmb.ValueMember];
+
+                                        if (val != null && Convert.ToInt32(val) == targetId)
+                                        {
+                                            cmb.SelectedIndex = i;
+                                            found = true;
+                                            System.Diagnostics.Debug.WriteLine($"    → Found at index {i}");
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (!found)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"    → NOT FOUND!");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"  ComboBox error: {ex.Message}");
+                            }
                         }
                     }
                 }
-                else if (control is DateTimePicker dtp)
+                else if (control is DateTimePicker dtp) 
                 {
-                    if (currentValue != DBNull.Value && currentValue is DateTime dt)
+                    if (currentValue != DBNull.Value && currentValue is DateTime dateValue)
                     {
-                        dtp.Value = dt;
+                        dtp.Checked = true;  // Устанавливаем чекбокс
+                        dtp.Value = dateValue; // Устанавливаем дату из базы
+                        System.Diagnostics.Debug.WriteLine($"  DateTimePicker {column.ColumnName}: {dateValue:dd.MM.yyyy}");
+                    }
+                    else
+                    {
+                        dtp.Checked = false; // Снимаем чекбокс - дата не заполнена
+                        System.Diagnostics.Debug.WriteLine($"  DateTimePicker {column.ColumnName}: NULL");
+                    }
+                }
+                else if (control is MaskedTextBox mtb)
+                {
+                    if (currentValue != DBNull.Value)
+                    {
+                        mtb.Text = currentValue.ToString();
                     }
                 }
                 else if (control is NumericUpDown nud)
@@ -297,6 +404,7 @@ namespace CarRentalDBForm
                         }
                         catch (Exception ex)
                         {
+                            System.Diagnostics.Debug.WriteLine($"  NumericUpDown error: {ex.Message}");
                         }
                     }
                 }
@@ -341,7 +449,9 @@ namespace CarRentalDBForm
             {
                 Format = DateTimePickerFormat.Short,
                 Font = FieldControlFont,
-                BackColor = Color.White
+                BackColor = Color.White,
+                ShowCheckBox = true,  // Добавляем чекбокс для возможности "пустой" даты
+                Checked = false        // По умолчанию дата не выбрана
             };
         }
 
@@ -350,8 +460,6 @@ namespace CarRentalDBForm
         /// </summary>
         private ComboBox CreateComboBox(string fieldName)
         {
-            var (lookupTable, displayField, valueField) = foreignKeys[fieldName];
-
             ComboBox cmb = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -359,15 +467,40 @@ namespace CarRentalDBForm
                 BackColor = Color.White
             };
 
-            DataTable lookupData = dbManager.GetTable(lookupTable);
-            if (lookupData != null)
-            {
-                cmb.DataSource = lookupData;
-                cmb.DisplayMember = displayField;
-                cmb.ValueMember = valueField;
-            }
+            // НЕ устанавливаем DataSource здесь!
+            // Это будет сделано в InitializeComboBoxData после добавления в Controls
 
             return cmb;
+        }
+
+        /// <summary>
+        /// Инициализирует данные ComboBox ПОСЛЕ добавления в Controls
+        /// </summary>
+        private void InitializeComboBoxData(ComboBox cmb, string fieldName)
+        {
+            if (!foreignKeys.ContainsKey(fieldName))
+                return;
+
+            var (lookupTable, displayField, valueField) = foreignKeys[fieldName];
+
+            System.Diagnostics.Debug.WriteLine($"\n>>> InitializeComboBoxData for '{fieldName}'");
+            System.Diagnostics.Debug.WriteLine($"    LookupTable: '{lookupTable}'");
+
+            DataTable lookupData = dbManager.GetTable(lookupTable);
+
+            if (lookupData != null && lookupData.Rows.Count > 0)
+            {
+                // ТЕПЕРЬ устанавливаем DataSource, когда контрол уже в визуальном дереве!
+                cmb.DisplayMember = displayField;
+                cmb.ValueMember = valueField;
+                cmb.DataSource = lookupData;
+
+                System.Diagnostics.Debug.WriteLine($"    ✓ ComboBox loaded: {cmb.Items.Count} items");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"    ✗ ERROR: lookupData is null or empty!");
+            }
         }
 
 
@@ -386,6 +519,25 @@ namespace CarRentalDBForm
                 DecimalPlaces = 0
             };
         }
+
+        /// <summary>
+/// Создаёт ComboBox для выбора статуса (Активен/Завершен)
+/// </summary>
+private ComboBox CreateStatusComboBox()
+{
+    ComboBox cmb = new ComboBox
+    {
+        DropDownStyle = ComboBoxStyle.DropDownList,
+        Font = FieldControlFont,
+        BackColor = Color.White
+    };
+
+    // Добавляем два варианта статуса
+    cmb.Items.Add("Активен");
+    cmb.Items.Add("Завершен");
+
+    return cmb;
+}
 
         // ================= ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =================
 
@@ -429,6 +581,12 @@ namespace CarRentalDBForm
                     return "Сотрудник";
                 case "Страховой Компании":
                     return "Страховая Компания";
+                case "Телефон":
+                    return "Телефон";
+                case "Паспорт":
+                    return "Паспорт";
+                case "Водительское удостоверение":
+                    return "Водительское удостоверение";
                 default:
                     return name;
             }
@@ -440,6 +598,55 @@ namespace CarRentalDBForm
         {
             try
             {
+                // ========== ПРОВЕРКА ДАТ ==========
+                // Проверяем, что план возврата не раньше даты выдачи
+                if (inputControls.ContainsKey("Дата_Выдачи") &&
+                    inputControls.ContainsKey("Планируемая_Дата_Возврата"))
+                {
+                    var dateIssue = inputControls["Дата_Выдачи"] as DateTimePicker;
+                    var datePlan = inputControls["Планируемая_Дата_Возврата"] as DateTimePicker;
+
+                    if (dateIssue != null && datePlan != null &&
+                        dateIssue.Checked && datePlan.Checked)
+                    {
+                        if (datePlan.Value.Date < dateIssue.Value.Date)
+                        {
+                            MessageBox.Show(
+                                "Планируемая дата возврата не может быть раньше даты выдачи!\n\n" +
+                                $"Дата выдачи: {dateIssue.Value:dd.MM.yyyy}\n" +
+                                $"План возврата: {datePlan.Value:dd.MM.yyyy}",
+                                "Ошибка в датах",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
+                            return;
+                        }
+                    }
+                }
+
+                // Проверяем, что фактическая дата возврата не раньше даты выдачи (если заполнена)
+                if (inputControls.ContainsKey("Дата_Выдачи") &&
+                    inputControls.ContainsKey("Фактическая_Дата_Возврата"))
+                {
+                    var dateIssue = inputControls["Дата_Выдачи"] as DateTimePicker;
+                    var dateFact = inputControls["Фактическая_Дата_Возврата"] as DateTimePicker;
+
+                    if (dateIssue != null && dateFact != null &&
+                        dateIssue.Checked && dateFact.Checked)
+                    {
+                        if (dateFact.Value.Date < dateIssue.Value.Date)
+                        {
+                            MessageBox.Show(
+                                "Фактическая дата возврата не может быть раньше даты выдачи!\n\n" +
+                                $"Дата выдачи: {dateIssue.Value:dd.MM.yyyy}\n" +
+                                $"Факт возврата: {dateFact.Value:dd.MM.yyyy}",
+                                "Ошибка в датах",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
+                            return;
+                        }
+                    }
+                }
+
                 Dictionary<string, string> fieldValues = new Dictionary<string, string>();
 
                 foreach (var kvp in inputControls)
@@ -454,19 +661,50 @@ namespace CarRentalDBForm
                     }
                     else if (control is ComboBox cmb)
                     {
-                        if (cmb.SelectedValue == null)
+                        // Для статуса проверяем Text
+                        if (kvp.Key == "Статус")
                         {
-                            MessageBox.Show($"Выберите значение для «{GetFieldDisplayName(columnName)}»!",
-                                "Предупреждение", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            return;
+                            value = cmb.Text;
+                            if (string.IsNullOrWhiteSpace(value))
+                            {
+                                value = "Активен"; // Значение по умолчанию
+                            }
                         }
-                        value = cmb.SelectedValue.ToString();
+                        else
+                        {
+                            // Для внешних ключей
+                            if (cmb.SelectedValue == null)
+                            {
+                                MessageBox.Show($"Выберите значение для «{GetFieldDisplayName(columnName)}»!",
+                                    "Предупреждение", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                return;
+                            }
+                            value = cmb.SelectedValue.ToString();
+                        }
                     }
                     else if (control is DateTimePicker dtp)
                     {
-                        value = "#" + dtp.Value.ToString("MM/dd/yyyy") + "#";
+                        if (dtp.Checked)
+                        {
+                            // Дата выбрана - сохраняем
+                            value = "#" + dtp.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + "#";
+                        }
+                        else
+                        {
+                            // Дата не выбрана - пустое значение
+                            value = "#NULL#";
+                        }
                         fieldValues[columnName] = value;
                         continue;
+                    }
+                    else if (control is MaskedTextBox mtb)
+                    {
+                        value = mtb.Text;
+                        // Если маска не заполнена полностью, считаем пустым
+                        if (!mtb.MaskCompleted)
+                        {
+                            value = "";
+                        }
                     }
                     else if (control is NumericUpDown nud)
                     {
@@ -494,19 +732,20 @@ namespace CarRentalDBForm
                 }
                 else
                 {
-                    //System.Diagnostics.Debug.WriteLine($"\n=== UPDATE Operation ===");
-                    //System.Diagnostics.Debug.WriteLine($"Table: {tableName}");
-                    //System.Diagnostics.Debug.WriteLine($"Record ID: {recordId}");
-                    //System.Diagnostics.Debug.WriteLine($"Fields to update: {fieldValues.Count}");
-                    //foreach (var kvp in fieldValues)
-                    //{
-                    //    System.Diagnostics.Debug.WriteLine($"  {kvp.Key} = {kvp.Value}");
-                    //}
+                    System.Diagnostics.Debug.WriteLine($"\n=== UPDATE Operation ===");
+                    System.Diagnostics.Debug.WriteLine($"Table: {tableName}");
+                    System.Diagnostics.Debug.WriteLine($"Record ID: {recordId}");
+                    System.Diagnostics.Debug.WriteLine($"Fields count: {fieldValues.Count}");
+                    foreach (var kvp in fieldValues)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"  {kvp.Key} = '{kvp.Value}'");
+                    }
 
                     success = dbManager.UpdateRecord(tableName, recordId, fieldValues);
                     successMessage = "Запись успешно обновлена!";
-                    //System.Diagnostics.Debug.WriteLine($"Result: {success}");
-                    //System.Diagnostics.Debug.WriteLine($"========================\n");
+
+                    System.Diagnostics.Debug.WriteLine($"Result: {success}");
+                    System.Diagnostics.Debug.WriteLine($"========================\n");
                 }
 
                 if (success)
@@ -533,6 +772,58 @@ namespace CarRentalDBForm
         {
             this.DialogResult = DialogResult.Cancel;
             this.Close();
+        }
+
+        /// <summary>
+        /// Создаёт MaskedTextBox с маской для ввода
+        /// </summary>
+        private MaskedTextBox CreateMaskedTextBox(string mask)
+        {
+            MaskedTextBox mtb = new MaskedTextBox
+            {
+                Mask = mask,
+                Font = FieldControlFont,
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.White
+            };
+
+            // Добавляем обработчик события ОТДЕЛЬНО
+            mtb.MaskInputRejected += (s, e) => {
+                // Игнорируем ошибочный ввод
+            };
+
+            return mtb;
+        }
+
+        /// <summary>
+        /// Получает маску для поля по его имени
+        /// </summary>
+        private string GetMaskForField(string fieldName)
+        {
+            string lower = fieldName.ToLower();
+
+            // Номер телефона
+            if (lower.Contains("телефон") || lower.Contains("phone"))
+            {
+                return "+7(000)000-00-00";
+            }
+
+            // Паспорт
+            if (lower.Contains("паспорт") || lower.Contains("passport"))
+            {
+                return "0000 000000";
+            }
+
+            // Водительское удостоверение
+            if (fieldName == "Номер_ВУ" ||
+              fieldName == "Водительское_удостоверение" ||
+              lower.Contains("номер_ву") ||
+              (lower.Contains("водитель") && lower.Contains("удостоверение")))
+            {
+                return "00 00 000000";
+            }
+
+            return "";
         }
     }
 }

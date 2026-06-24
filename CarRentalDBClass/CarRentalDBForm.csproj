@@ -16,4 +16,10 @@
     <ProjectReference Include="..\CarRentalClassLibrary\CarRentalClassLibrary.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="DataBase\Car_DB_practice.accdb">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

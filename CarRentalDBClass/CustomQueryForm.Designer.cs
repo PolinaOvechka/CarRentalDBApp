@@ -46,19 +46,20 @@
             panelHeader.Controls.Add(labelTitle);
             panelHeader.Dock = DockStyle.Top;
             panelHeader.Location = new Point(0, 0);
+            panelHeader.Margin = new Padding(3, 4, 3, 4);
             panelHeader.Name = "panelHeader";
-            panelHeader.Size = new Size(522, 60);
+            panelHeader.Size = new Size(597, 76);
             panelHeader.TabIndex = 1;
             // 
             // labelTitle
             // 
             labelTitle.AutoSize = true;
             labelTitle.BackColor = Color.Transparent;
-            labelTitle.Font = new Font("Inter Medium", 14.25F, FontStyle.Bold);
+            labelTitle.Font = new Font("Microsoft Sans Serif", 14.25F, FontStyle.Bold);
             labelTitle.ForeColor = Color.WhiteSmoke;
-            labelTitle.Location = new Point(22, 17);
+            labelTitle.Location = new Point(25, 22);
             labelTitle.Name = "labelTitle";
-            labelTitle.Size = new Size(228, 23);
+            labelTitle.Size = new Size(246, 26);
             labelTitle.TabIndex = 0;
             labelTitle.Text = "Создать свой запрос";
             // 
@@ -67,9 +68,10 @@
             panelButtons.Controls.Add(buttonCancel);
             panelButtons.Controls.Add(buttonExecute);
             panelButtons.Dock = DockStyle.Bottom;
-            panelButtons.Location = new Point(0, 396);
+            panelButtons.Location = new Point(0, 502);
+            panelButtons.Margin = new Padding(3, 4, 3, 4);
             panelButtons.Name = "panelButtons";
-            panelButtons.Size = new Size(522, 65);
+            panelButtons.Size = new Size(597, 82);
             panelButtons.TabIndex = 3;
             // 
             // buttonCancel
@@ -79,11 +81,12 @@
             buttonCancel.FlatAppearance.BorderColor = Color.Crimson;
             buttonCancel.FlatAppearance.BorderSize = 2;
             buttonCancel.FlatStyle = FlatStyle.Flat;
-            buttonCancel.Font = new Font("Inter", 9.75F, FontStyle.Bold);
+            buttonCancel.Font = new Font("Microsoft Sans Serif", 9.75F, FontStyle.Bold);
             buttonCancel.ForeColor = Color.Crimson;
-            buttonCancel.Location = new Point(265, 13);
+            buttonCancel.Location = new Point(303, 16);
+            buttonCancel.Margin = new Padding(3, 4, 3, 4);
             buttonCancel.Name = "buttonCancel";
-            buttonCancel.Size = new Size(233, 40);
+            buttonCancel.Size = new Size(266, 51);
             buttonCancel.TabIndex = 2;
             buttonCancel.Text = "Отмена";
             buttonCancel.UseVisualStyleBackColor = false;
@@ -95,11 +98,12 @@
             buttonExecute.Cursor = Cursors.Hand;
             buttonExecute.FlatAppearance.BorderSize = 0;
             buttonExecute.FlatStyle = FlatStyle.Flat;
-            buttonExecute.Font = new Font("Inter", 9.75F, FontStyle.Bold);
+            buttonExecute.Font = new Font("Microsoft Sans Serif", 9.75F, FontStyle.Bold);
             buttonExecute.ForeColor = Color.WhiteSmoke;
-            buttonExecute.Location = new Point(22, 13);
+            buttonExecute.Location = new Point(25, 16);
+            buttonExecute.Margin = new Padding(3, 4, 3, 4);
             buttonExecute.Name = "buttonExecute";
-            buttonExecute.Size = new Size(233, 40);
+            buttonExecute.Size = new Size(266, 51);
             buttonExecute.TabIndex = 1;
             buttonExecute.Text = "Выполнить";
             buttonExecute.UseVisualStyleBackColor = false;
@@ -109,35 +113,38 @@
             // 
             panelSql.Controls.Add(textBoxQuery);
             panelSql.Dock = DockStyle.Fill;
-            panelSql.Location = new Point(0, 60);
+            panelSql.Location = new Point(0, 76);
+            panelSql.Margin = new Padding(3, 4, 3, 4);
             panelSql.Name = "panelSql";
-            panelSql.Size = new Size(522, 336);
+            panelSql.Size = new Size(597, 426);
             panelSql.TabIndex = 4;
             // 
             // textBoxQuery
             // 
             textBoxQuery.BorderStyle = BorderStyle.FixedSingle;
             textBoxQuery.Font = new Font("Consolas", 9F, FontStyle.Regular, GraphicsUnit.Point, 204);
-            textBoxQuery.Location = new Point(22, 22);
+            textBoxQuery.Location = new Point(25, 28);
+            textBoxQuery.Margin = new Padding(3, 4, 3, 4);
             textBoxQuery.Multiline = true;
             textBoxQuery.Name = "textBoxQuery";
-            textBoxQuery.Size = new Size(476, 293);
+            textBoxQuery.Size = new Size(544, 371);
             textBoxQuery.TabIndex = 0;
             // 
-            // CustomQuerryForm
+            // CustomQueryForm
             // 
-            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleDimensions = new SizeF(8F, 19F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(522, 461);
+            ClientSize = new Size(597, 584);
             Controls.Add(panelSql);
             Controls.Add(panelButtons);
             Controls.Add(panelHeader);
             FormBorderStyle = FormBorderStyle.FixedDialog;
+            Margin = new Padding(3, 4, 3, 4);
             MaximizeBox = false;
             MinimizeBox = false;
-            Name = "CustomQuerryForm";
+            Name = "CustomQueryForm";
             StartPosition = FormStartPosition.CenterParent;
-            Text = "CustomQuerryForm";
+            Text = "Создать свой запрос";
             panelHeader.ResumeLayout(false);
             panelHeader.PerformLayout();
             panelButtons.ResumeLayout(false);

@@ -462,17 +462,22 @@ namespace CarRentalClassLibrary
 
                     if (kvp.Value.StartsWith("#") && kvp.Value.EndsWith("#"))
                     {
-                        // Дата
-                        values.Add(kvp.Value);
+
+                        if (kvp.Value == "#NULL#")
+                        {
+                            values.Add("NULL");
+                        }
+                        else
+                        {
+                            values.Add(kvp.Value);
+                        }
                     }
                     else if (IsNumericValue(kvp.Value))
                     {
-                        // Число
                         values.Add(kvp.Value);
                     }
                     else
                     {
-                        // Строка
                         string escapedValue = kvp.Value.Replace("'", "''");
                         values.Add("'" + escapedValue + "'");
                     }
@@ -503,24 +508,38 @@ namespace CarRentalClassLibrary
                 string idFieldName = GetIdFieldName(tableName);
                 List<string> setClauses = new List<string>();
 
+                System.Diagnostics.Debug.WriteLine($"\n=== UpdateRecord ===");
+                System.Diagnostics.Debug.WriteLine($"Table: {tableName}");
+                System.Diagnostics.Debug.WriteLine($"ID field: {idFieldName}");
+                System.Diagnostics.Debug.WriteLine($"ID value: {id}");
+
                 foreach (var kvp in fieldValues)
                 {
                     string value;
 
                     if (kvp.Value.StartsWith("#") && kvp.Value.EndsWith("#"))
                     {
-                        // Дата
-                        value = kvp.Value;
+                        // Проверяем, это NULL?
+                        if (kvp.Value == "#NULL#")
+                        {
+                            value = "NULL";  // Без кавычек!
+                            System.Diagnostics.Debug.WriteLine($"  NULL: {kvp.Key} = NULL");
+                        }
+                        else
+                        {
+                            value = kvp.Value;
+                            System.Diagnostics.Debug.WriteLine($"  Date: {kvp.Key} = {kvp.Value}");
+                        }
                     }
                     else if (IsNumericValue(kvp.Value))
                     {
-                        // Число
                         value = kvp.Value;
+                        System.Diagnostics.Debug.WriteLine($"  Number: {kvp.Key} = {kvp.Value}");
                     }
                     else
                     {
-                        // Строка
                         value = "'" + kvp.Value.Replace("'", "''") + "'";
+                        System.Diagnostics.Debug.WriteLine($"  String: {kvp.Key} = {value}");
                     }
 
                     setClauses.Add($"[{kvp.Key}] = {value}");
@@ -528,12 +547,19 @@ namespace CarRentalClassLibrary
 
                 string query = $"UPDATE [{tableName}] SET {string.Join(", ", setClauses)} WHERE [{idFieldName}] = {id}";
 
+                System.Diagnostics.Debug.WriteLine($"\nGenerated SQL:\n{query}\n");
+
                 int result = ExecuteNonQuery(query);
+
+                System.Diagnostics.Debug.WriteLine($"Rows affected: {result}");
+                System.Diagnostics.Debug.WriteLine($"====================\n");
 
                 return result > 0;
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"EXCEPTION in UpdateRecord: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack: {ex.StackTrace}");
                 return false;
             }
         }
