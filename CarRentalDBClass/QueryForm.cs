@@ -253,22 +253,22 @@ namespace CarRentalDBForm
 
             Graphics g = e.Graphics;
 
-            Font titleFont = new Font("Arial", 12, FontStyle.Bold);
+            Font titleFont = new Font("Arial", 14, FontStyle.Bold);
             Font headerFont = new Font("Arial", 10, FontStyle.Bold);
             Font cellFont = new Font("Arial", 9, FontStyle.Regular);
 
             int leftMargin = e.MarginBounds.Left;
             int topMargin = e.MarginBounds.Top;
-            int yPos = topMargin;
+            float yPos = topMargin;
 
             // Заголовок
             string title = currentQueryTitle ?? "Результат запроса";
             g.DrawString(title, titleFont, Brushes.Black, leftMargin, yPos);
-            yPos += 35;
+            yPos += 40;
 
             // Дата
             g.DrawString($"Дата: {DateTime.Now:dd.MM.yyyy HH:mm}", cellFont, Brushes.Gray, leftMargin, yPos);
-            yPos += 30;
+            yPos += 35;
 
             // Ширина колонок
             float totalWidth = e.MarginBounds.Width;
@@ -278,43 +278,64 @@ namespace CarRentalDBForm
             float xPos = leftMargin;
             for (int i = 0; i < currentResult.Columns.Count; i++)
             {
-                RectangleF headerRect = new RectangleF(xPos, yPos, columnWidth, 25);
+                RectangleF headerRect = new RectangleF(xPos, yPos, columnWidth, 30);
                 g.FillRectangle(Brushes.LightGray, headerRect);
                 g.DrawString(currentResult.Columns[i].ColumnName, headerFont, Brushes.Black, headerRect);
                 xPos += columnWidth;
             }
-            yPos += 25;
+            yPos += 30;
 
-            // Данные
+            // Данные с автоматической высотой строк
             for (int row = 0; row < currentResult.Rows.Count; row++)
             {
+                // Измеряем высоту строки по самому высокому тексту в ячейках
+                float rowHeight = 0;
+                List<string> cellValues = new List<string>();
+
+                for (int col = 0; col < currentResult.Columns.Count; col++)
+                {
+                    string cellValue = currentResult.Rows[row][col] == DBNull.Value
+                        ? ""
+                        : currentResult.Rows[row][col].ToString();
+                    cellValues.Add(cellValue);
+
+                    // Измеряем высоту текста с переносом
+                    SizeF textSize = g.MeasureString(cellValue, cellFont, (int)columnWidth);
+                    if (textSize.Height > rowHeight)
+                        rowHeight = textSize.Height;
+                }
+
+                // Минимальная высота строки 25
+                if (rowHeight < 25)
+                    rowHeight = 25;
+
+                // Рисуем ячейки строки
                 xPos = leftMargin;
                 for (int col = 0; col < currentResult.Columns.Count; col++)
                 {
-                    RectangleF cellRect = new RectangleF(xPos, yPos, columnWidth, 20);
+                    RectangleF cellRect = new RectangleF(xPos, yPos, columnWidth, rowHeight);
 
-                    // Чередование цветов строк
+                    // Чередование цветов
                     if (row % 2 == 0)
                         g.FillRectangle(Brushes.White, cellRect);
                     else
                         g.FillRectangle(Brushes.WhiteSmoke, cellRect);
 
-                    string cellValue = currentResult.Rows[row][col] == DBNull.Value
-                        ? ""
-                        : currentResult.Rows[row][col].ToString();
-
-                    g.DrawString(cellValue, cellFont, Brushes.Black, cellRect);
+                    g.DrawString(cellValues[col], cellFont, Brushes.Black, cellRect);
                     xPos += columnWidth;
                 }
-                yPos += 20;
 
-                // Не вышли ли за пределы страницы
-                if (yPos > e.MarginBounds.Bottom - 20)
+                yPos += rowHeight;
+
+                // Проверка конца страницы
+                if (yPos > e.MarginBounds.Bottom - 30)
                 {
                     e.HasMorePages = true;
                     return;
                 }
             }
+
+            e.HasMorePages = false;
         }
     }
 }
