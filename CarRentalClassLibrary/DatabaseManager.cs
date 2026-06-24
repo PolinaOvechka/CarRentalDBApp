@@ -13,6 +13,13 @@ namespace CarRentalClassLibrary
         private string connectionString = @"Provider=Microsoft.ACE.OLEDB.12.0;Data Source=|DataDirectory|\DataBase\Car_DB_practice.accdb";
         public string LastError { get; private set; } = string.Empty;
 
+        // ============================================
+        // ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ
+        // ============================================
+
+        /// <summary>
+        /// Подключиться к базе данных
+        /// </summary>
         public bool Connect()
         {
             try
@@ -35,6 +42,9 @@ namespace CarRentalClassLibrary
             }
         }
 
+        /// <summary>
+        /// Отключиться от базы данных
+        /// </summary>
         public void Disconnect()
         {
             if (connection != null && connection.State == ConnectionState.Open)
@@ -45,6 +55,13 @@ namespace CarRentalClassLibrary
             }
         }
 
+        // ============================================
+        // ПОЛУЧЕНИЕ ДАННЫХ ИЗ ТАБЛИЦ
+        // ============================================
+
+        /// <summary>
+        /// Получить все записи из таблицы
+        /// </summary>
         public DataTable GetTable(string tableName)
         {
             if (string.IsNullOrEmpty(tableName))
@@ -68,6 +85,34 @@ namespace CarRentalClassLibrary
             return dataTable;
         }
 
+        /// <summary>
+        /// Получить таблицу с красивыми данными (JOIN с другими таблицами)
+        /// </summary>
+        public DataTable GetExtendedTable(string tableName)
+        {
+            if (string.IsNullOrEmpty(tableName))
+            {
+                return null;
+            }
+
+            string query = GetExtendedQuery(tableName);
+
+            if (string.IsNullOrEmpty(query))
+            {
+                // Если для таблицы нет специального запроса - вернуть обычную таблицу
+                return GetTable(tableName);
+            }
+
+            return ExecuteQuery(query);
+        }
+
+        // ============================================
+        // ВЫПОЛНЕНИЕ SQL-ЗАПРОСОВ
+        // ============================================
+
+        /// <summary>
+        /// Выполнить SELECT-запрос и вернуть результат
+        /// </summary>
         public DataTable ExecuteQuery(string query)
         {
             if (string.IsNullOrEmpty(query))
@@ -78,28 +123,31 @@ namespace CarRentalClassLibrary
             DataTable dataTable = new DataTable();
             try
             {
-                Debug.WriteLine($"\n========== SQL Query ==========");
-                Debug.WriteLine($"Query:\n{query}");
+                // Debug.WriteLine($"\n========== SQL Query ==========");
+                // Debug.WriteLine($"Query:\n{query}");
 
                 using (OleDbDataAdapter adapter = new OleDbDataAdapter(query, connection))
                 {
                     adapter.Fill(dataTable);
                 }
 
-                Debug.WriteLine($"✓ Success: {dataTable.Rows.Count} rows\n");
+                // Debug.WriteLine($"✓ Success: {dataTable.Rows.Count} rows\n");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"\n========== SQL ERROR ==========");
-                Debug.WriteLine($"✗ Error: {ex.Message}");
-                Debug.WriteLine($"Query:\n{query}");
-                Debug.WriteLine($"Stack: {ex.StackTrace}\n");
+                // Debug.WriteLine($"\n========== SQL ERROR ==========");
+                // Debug.WriteLine($"✗ Error: {ex.Message}");
+                // Debug.WriteLine($"Query:\n{query}");
+                // Debug.WriteLine($"Stack: {ex.StackTrace}\n");
 
                 return null;
             }
             return dataTable;
         }
 
+        /// <summary>
+        /// Выполнить запрос без возврата данных (INSERT, UPDATE, DELETE)
+        /// </summary>
         public int ExecuteNonQuery(string query)
         {
             if (string.IsNullOrEmpty(query))
@@ -120,18 +168,12 @@ namespace CarRentalClassLibrary
             }
         }
 
-        public OleDbConnection GetConnection()
-        {
-            return connection;
-        }
-
-        public string GetConnectionString()
-        {
-            return connectionString;
-        }
+        // ============================================
+        // ИНФОРМАЦИЯ О СТРУКТУРЕ БАЗЫ ДАННЫХ
+        // ============================================
 
         /// <summary>
-        /// Получает список всех таблиц из БД
+        /// Получить список всех таблиц в базе
         /// </summary>
         public List<string> GetAllTableNames()
         {
@@ -153,7 +195,7 @@ namespace CarRentalClassLibrary
                     foreach (DataRow row in schemaTable.Rows)
                     {
                         string tableName = row["TABLE_NAME"].ToString();
-                        if (!tableName.StartsWith("MSys"))
+                        if (!tableName.StartsWith("MSys")) // Системные таблицы не нужны
                         {
                             tableNames.Add(tableName);
                         }
@@ -169,26 +211,75 @@ namespace CarRentalClassLibrary
         }
 
         /// <summary>
-        /// Форматированные данные таблицы
+        /// Получить информацию о подключении
         /// </summary>
-        public DataTable GetExtendedTable(string tableName)
+        public OleDbConnection GetConnection()
         {
-            if (string.IsNullOrEmpty(tableName))
+            return connection;
+        }
+
+        /// <summary>
+        /// Получить строку подключения
+        /// </summary>
+        public string GetConnectionString()
+        {
+            return connectionString;
+        }
+
+        // ============================================
+        // ПОИСК ДАННЫХ
+        // ============================================
+
+        /// <summary>
+        /// Поиск записей по значению в поле
+        /// </summary>
+        public DataTable SearchInTable(string tableName, string fieldName, string searchValue)
+        {
+            if (string.IsNullOrEmpty(tableName) || string.IsNullOrEmpty(fieldName) || string.IsNullOrEmpty(searchValue))
             {
                 return null;
             }
 
-            string query = GetExtendedQuery(tableName);
+            string extendedQuery = GetExtendedQuery(tableName);
 
-            if (string.IsNullOrEmpty(query))
+            if (!string.IsNullOrEmpty(extendedQuery))
             {
-                // Если запрос не определён, возвращаем обычную таблицу
-                return GetTable(tableName);
+                // Для таблиц с JOIN - ищем правильное имя поля
+                string searchCondition = GetSearchConditionForExtendedTable(tableName, fieldName, searchValue);
+
+                if (!string.IsNullOrEmpty(searchCondition))
+                {
+                    // Вставляем WHERE перед ORDER BY
+                    string query;
+                    int orderByIndex = extendedQuery.LastIndexOf("ORDER BY", StringComparison.OrdinalIgnoreCase);
+
+                    if (orderByIndex >= 0)
+                    {
+                        query = extendedQuery.Substring(0, orderByIndex) +
+                                "WHERE " + searchCondition + "\n" +
+                                extendedQuery.Substring(orderByIndex);
+                    }
+                    else
+                    {
+                        query = extendedQuery + "\nWHERE " + searchCondition;
+                    }
+
+                    return ExecuteQuery(query);
+                }
             }
 
-            return ExecuteQuery(query);
+            // Для обычных таблиц - простой поиск
+            string simpleQuery = $"SELECT * FROM [{tableName}] WHERE [{fieldName}] LIKE '%{searchValue}%'";
+            return ExecuteQuery(simpleQuery);
         }
 
+        // ============================================
+        // ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ДЛЯ РАСШИРЕННЫХ ЗАПРОСОВ
+        // ============================================
+
+        /// <summary>
+        /// SQL-запрос для красивой таблицы с JOIN
+        /// </summary>
         private string GetExtendedQuery(string tableName)
         {
             switch (tableName)
@@ -249,55 +340,11 @@ namespace CarRentalClassLibrary
         }
 
         /// <summary>
-        /// Выполняет поиск по таблице с учётом расширенных запросов
-        /// </summary>
-        public DataTable SearchInTable(string tableName, string fieldName, string searchValue)
-        {
-            if (string.IsNullOrEmpty(tableName) || string.IsNullOrEmpty(fieldName) || string.IsNullOrEmpty(searchValue))
-            {
-                return null;
-            }
-
-            string extendedQuery = GetExtendedQuery(tableName);
-
-            if (!string.IsNullOrEmpty(extendedQuery))
-            {
-                // Для расширенных таблиц - формируем условие WHERE с правильными именами полей
-                string searchCondition = GetSearchConditionForExtendedTable(tableName, fieldName, searchValue);
-
-                if (!string.IsNullOrEmpty(searchCondition))
-                {
-                    // Вставляем WHERE перед ORDER BY
-                    string query;
-                    int orderByIndex = extendedQuery.LastIndexOf("ORDER BY", StringComparison.OrdinalIgnoreCase);
-
-                    if (orderByIndex >= 0)
-                    {
-                        query = extendedQuery.Substring(0, orderByIndex) +
-                                "WHERE " + searchCondition + "\n" +
-                                extendedQuery.Substring(orderByIndex);
-                    }
-                    else
-                    {
-                        query = extendedQuery + "\nWHERE " + searchCondition;
-                    }
-
-                    return ExecuteQuery(query);
-                }
-            }
-
-            // Для обычных таблиц
-            string simpleQuery = $"SELECT * FROM [{tableName}] WHERE [{fieldName}] LIKE '%{searchValue}%'";
-            return ExecuteQuery(simpleQuery);
-        }
-
-
-        /// <summary>
-        /// Возвращает условие WHERE для поиска в расширенных таблицах
+        /// Получить правильное имя поля для поиска в таблице с JOIN
         /// </summary>
         private string GetSearchConditionForExtendedTable(string tableName, string displayFieldName, string searchValue)
         {
-            // Маппинг на полные имена полей
+            // Соответствие отображаемых имён полей реальным именам в БД
             var fieldMapping = new Dictionary<string, Dictionary<string, string>>
             {
                 ["Договора проекта"] = new Dictionary<string, string>
@@ -340,12 +387,16 @@ namespace CarRentalClassLibrary
                 return $"{fullFieldName} LIKE '%{searchValue.Replace("'", "''")}%'";
             }
 
-            // Если маппинг не найден - используем имя как есть
+            // Если не нашли в словаре - используем как есть
             return $"[{displayFieldName}] LIKE '%{searchValue.Replace("'", "''")}%'";
         }
 
+        // ============================================
+        // РАБОТА С ID ЗАПИСЕЙ
+        // ============================================
+
         /// <summary>
-        /// Возвращает имя поля первичного ключа для указанной таблицы
+        /// Получить имя поля первичного ключа для таблицы
         /// </summary>
         public string GetIdFieldName(string tableName)
         {
@@ -370,8 +421,12 @@ namespace CarRentalClassLibrary
             }
         }
 
+        // ============================================
+        // CRUD ОПЕРАЦИИ (СОЗДАНИЕ, ЧТЕНИЕ, ОБНОВЛЕНИЕ, УДАЛЕНИЕ)
+        // ============================================
+
         /// <summary>
-        /// Удаляет запись из таблицы по ID
+        /// Удалить запись по ID
         /// </summary>
         public bool DeleteRecord(string tableName, int id)
         {
@@ -389,7 +444,7 @@ namespace CarRentalClassLibrary
         }
 
         /// <summary>
-        /// Добавляет новую запись в таблицу
+        /// Добавить новую запись в таблицу
         /// </summary>
         public bool InsertRecord(string tableName, Dictionary<string, string> fieldValues)
         {
@@ -407,17 +462,17 @@ namespace CarRentalClassLibrary
 
                     if (kvp.Value.StartsWith("#") && kvp.Value.EndsWith("#"))
                     {
-                        // Дата
+                        // Дата в формате Access #dd.mm.yyyy#
                         values.Add(kvp.Value);
                     }
                     else if (IsNumericValue(kvp.Value))
                     {
-                        // Число (без пробелов)
+                        // Число - добавляем без кавычек
                         values.Add(kvp.Value);
                     }
                     else
                     {
-                        // Строка - экранируем кавычки
+                        // Строка - экранируем одинарные кавычки
                         string escapedValue = kvp.Value.Replace("'", "''");
                         values.Add("'" + escapedValue + "'");
                     }
@@ -436,7 +491,7 @@ namespace CarRentalClassLibrary
         }
 
         /// <summary>
-        /// Обновляет запись в таблице
+        /// Обновить существующую запись
         /// </summary>
         public bool UpdateRecord(string tableName, int id, Dictionary<string, string> fieldValues)
         {
@@ -459,7 +514,7 @@ namespace CarRentalClassLibrary
                     }
                     else if (IsNumericValue(kvp.Value))
                     {
-                        // Число (без пробелов и других символов)
+                        // Число
                         value = kvp.Value;
                     }
                     else
@@ -484,23 +539,27 @@ namespace CarRentalClassLibrary
         }
 
         /// <summary>
-        /// Проверяет, является ли значение числом (без пробелов и других символов)
+        /// Проверка: является ли значение числом
         /// </summary>
         private bool IsNumericValue(string value)
         {
             if (string.IsNullOrWhiteSpace(value))
                 return false;
 
-            // Если содержит пробелы - это не число
+            // Если есть пробелы - точно не число
             if (value.Contains(" "))
                 return false;
 
-            // Проверяем, можно ли преобразовать в число
+            // Пытаемся преобразовать в число
             return int.TryParse(value, out _) || double.TryParse(value, out _);
         }
 
+        // ============================================
+        // ПОЛУЧЕНИЕ ОТДЕЛЬНОЙ ЗАПИСИ
+        // ============================================
+
         /// <summary>
-        /// Получает одну запись из таблицы по ID
+        /// Получить одну запись по ID
         /// </summary>
         public DataTable GetRecordById(string tableName, int id)
         {

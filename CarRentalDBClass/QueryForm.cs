@@ -13,7 +13,7 @@ namespace CarRentalDBForm
         private DataTable currentResult;
         private string currentQueryTitle;
 
-        // Предустановленные запросы-отчёты
+        // Предустановленные запросы
         private readonly (string name, string sql)[] predefinedQueries = new[]
         {
             (
@@ -126,7 +126,7 @@ namespace CarRentalDBForm
         }
 
         /// <summary>
-        /// Кнопка "Создать свой запрос"
+        /// Кнопка Создать свой запрос
         /// </summary>
         private void buttonCustomQuery_Click(object sender, EventArgs e)
         {
@@ -165,32 +165,20 @@ namespace CarRentalDBForm
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"\n=== Executing Query ===");
-
                 currentResult = dbManager.ExecuteQuery(query);
 
                 if (currentResult != null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Result rows: {currentResult.Rows.Count}");
-
-                    // Очищаем
+                    // Очищаем таблицу
                     dataGridViewResults.DataSource = null;
                     dataGridViewResults.Columns.Clear();
 
                     // Привязываем данные
+                    dataGridViewResults.AutoGenerateColumns = true;
                     dataGridViewResults.DataSource = currentResult;
 
-                    // Настраиваем
-                    dataGridViewResults.AllowUserToAddRows = false;
-                    dataGridViewResults.ReadOnly = true;
-                    dataGridViewResults.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                    dataGridViewResults.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                    dataGridViewResults.ColumnHeadersDefaultCellStyle.Font = new Font("Inter", 9.75f, FontStyle.Bold);
-
-                    // Принудительно обновляем визуал
+                    // Обновляем отображение
                     dataGridViewResults.Refresh();
-                    dataGridViewResults.Update();
-                    Application.DoEvents(); // ← ВАЖНО! Даём UI обновиться
 
                     // Прокрутка к началу
                     if (dataGridViewResults.Rows.Count > 0)
@@ -198,17 +186,9 @@ namespace CarRentalDBForm
                         dataGridViewResults.FirstDisplayedScrollingRowIndex = 0;
                     }
 
-                    System.Diagnostics.Debug.WriteLine($"Displayed rows: {dataGridViewResults.Rows.Count}");
-                    System.Diagnostics.Debug.WriteLine($"Visible rows: {dataGridViewResults.DisplayedRowCount(true)}");
-
-                    // Показываем сообщение ПОСЛЕ обновления DataGridView
+                    // Обновляем заголовок формы
                     if (currentResult.Rows.Count > 0)
                     {
-                        // Не показываем MessageBox - он мешает видеть таблицу
-                        // MessageBox.Show($"Запрос выполнен успешно!\nНайдено записей: {currentResult.Rows.Count}",
-                        //    "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                        // Вместо этого обновим заголовок формы
                         this.Text = $"Запросы - найдено: {currentResult.Rows.Count} записей";
                     }
                     else
@@ -231,7 +211,7 @@ namespace CarRentalDBForm
         }
 
         /// <summary>
-        /// Кнопка "Печать"
+        /// Кнопка печати
         /// </summary>
         private void buttonPrint_Click(object sender, EventArgs e)
         {
@@ -264,39 +244,137 @@ namespace CarRentalDBForm
             }
         }
 
+        /// <summary>
+        /// Красивое форматирование для печати
+        /// </summary>
         private void PrintDocument_PrintPage(object sender, PrintPageEventArgs e)
         {
             if (currentResult == null) return;
 
             Graphics g = e.Graphics;
-            Font titleFont = new Font("Inter", 16, FontStyle.Bold);
-            Font headerFont = new Font("Inter", 10, FontStyle.Bold);
-            Font cellFont = new Font("Inter", 9, FontStyle.Regular);
+
+            Font titleFont = new Font("Arial", 14, FontStyle.Bold);
+            Font headerFont = new Font("Arial", 10, FontStyle.Bold);
+            Font cellFont = new Font("Arial", 9, FontStyle.Regular);
 
             int leftMargin = e.MarginBounds.Left;
             int topMargin = e.MarginBounds.Top;
             int yPos = topMargin;
 
+            // Заголовок
             string title = currentQueryTitle ?? "Результат запроса";
             g.DrawString(title, titleFont, Brushes.Black, leftMargin, yPos);
             yPos += 40;
 
+            // Дата
             g.DrawString($"Дата: {DateTime.Now:dd.MM.yyyy HH:mm}", cellFont, Brushes.Gray, leftMargin, yPos);
-            yPos += 30;
+            yPos += 35;
 
+            // Ширина колонок
             float totalWidth = e.MarginBounds.Width;
             float columnWidth = totalWidth / currentResult.Columns.Count;
 
+            // Заголовки таблицы
+            float xPos = leftMargin;
+            for (int i = 0; i < currentResult.Columns.Count; i++)
+            {
+                RectangleF headerRect = new RectangleF(xPos, yPos, columnWidth, 30);
+                g.FillRectangle(Brushes.LightGray, headerRect);
+                g.DrawString(currentResult.Columns[i].ColumnName, headerFont, Brushes.Black, headerRect);
+                xPos += columnWidth;
+            }
+            yPos += 30;
+
+            // Данные с автоматической высотой строк
+            for (int row = 0; row < currentResult.Rows.Count; row++)
+            {
+                // Измеряем высоту строки по самому высокому тексту в ячейках
+                float rowHeight = 0;
+                List<string> cellValues = new List<string>();
+
+                for (int col = 0; col < currentResult.Columns.Count; col++)
+                {
+                    string cellValue = currentResult.Rows[row][col] == DBNull.Value
+                        ? ""
+                        : currentResult.Rows[row][col].ToString();
+                    cellValues.Add(cellValue);
+
+                    // Измеряем высоту текста с переносом
+                    SizeF textSize = g.MeasureString(cellValue, cellFont, (int)columnWidth);
+                    if (textSize.Height > rowHeight)
+                        rowHeight = textSize.Height;
+                }
+
+                // Минимальная высота строки 25
+                if (rowHeight < 25)
+                    rowHeight = 25;
+
+                // Рисуем ячейки строки
+                xPos = leftMargin;
+                for (int col = 0; col < currentResult.Columns.Count; col++)
+                {
+                    RectangleF cellRect = new RectangleF(xPos, yPos, columnWidth, rowHeight);
+
+                    // Чередование цветов
+                    if (row % 2 == 0)
+                        g.FillRectangle(Brushes.White, cellRect);
+                    else
+                        g.FillRectangle(Brushes.WhiteSmoke, cellRect);
+
+                    g.DrawString(cellValues[col], cellFont, Brushes.Black, cellRect);
+                    xPos += columnWidth;
+                }
+
+                yPos += rowHeight;
+
+                // Проверка конца страницы
+                if (yPos > e.MarginBounds.Bottom - 30)
+                {
+                    e.HasMorePages = true;
+                    return;
+                }
+            }
+
+            e.HasMorePages = false;
+        }
+        {
+            if (currentResult == null) return;
+
+            Graphics g = e.Graphics;
+
+            Font titleFont = new Font("Arial", 12, FontStyle.Bold);
+            Font headerFont = new Font("Arial", 10, FontStyle.Bold);
+            Font cellFont = new Font("Arial", 9, FontStyle.Regular);
+
+            int leftMargin = e.MarginBounds.Left;
+            int topMargin = e.MarginBounds.Top;
+            int yPos = topMargin;
+
+            // Заголовок
+            string title = currentQueryTitle ?? "Результат запроса";
+            g.DrawString(title, titleFont, Brushes.Black, leftMargin, yPos);
+            yPos += 35;
+
+            // Дата
+            g.DrawString($"Дата: {DateTime.Now:dd.MM.yyyy HH:mm}", cellFont, Brushes.Gray, leftMargin, yPos);
+            yPos += 30;
+
+            // Ширина колонок
+            float totalWidth = e.MarginBounds.Width;
+            float columnWidth = totalWidth / currentResult.Columns.Count;
+
+            // Заголовки таблицы
             float xPos = leftMargin;
             for (int i = 0; i < currentResult.Columns.Count; i++)
             {
                 RectangleF headerRect = new RectangleF(xPos, yPos, columnWidth, 25);
-                g.FillRectangle(Brushes.RoyalBlue, headerRect);
-                g.DrawString(currentResult.Columns[i].ColumnName, headerFont, Brushes.White, headerRect);
+                g.FillRectangle(Brushes.LightGray, headerRect);
+                g.DrawString(currentResult.Columns[i].ColumnName, headerFont, Brushes.Black, headerRect);
                 xPos += columnWidth;
             }
             yPos += 25;
 
+            // Данные
             for (int row = 0; row < currentResult.Rows.Count; row++)
             {
                 xPos = leftMargin;
@@ -304,20 +382,22 @@ namespace CarRentalDBForm
                 {
                     RectangleF cellRect = new RectangleF(xPos, yPos, columnWidth, 20);
 
+                    // Чередование цветов строк
                     if (row % 2 == 0)
-                    {
+                        g.FillRectangle(Brushes.White, cellRect);
+                    else
                         g.FillRectangle(Brushes.WhiteSmoke, cellRect);
-                    }
 
                     string cellValue = currentResult.Rows[row][col] == DBNull.Value
                         ? ""
                         : currentResult.Rows[row][col].ToString();
-                    g.DrawString(cellValue, cellFont, Brushes.Black, cellRect);
 
+                    g.DrawString(cellValue, cellFont, Brushes.Black, cellRect);
                     xPos += columnWidth;
                 }
                 yPos += 20;
 
+                // Не вышли ли за пределы страницы
                 if (yPos > e.MarginBounds.Bottom - 20)
                 {
                     e.HasMorePages = true;

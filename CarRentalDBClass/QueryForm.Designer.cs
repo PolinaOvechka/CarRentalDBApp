@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
             panelHeader = new Panel();
             buttonCustomQuery = new Button();
             labelTitle = new Label();
@@ -172,6 +173,8 @@
             dataGridViewResults.Location = new Point(0, 145);
             dataGridViewResults.Name = "dataGridViewResults";
             dataGridViewResults.ReadOnly = true;
+            dataGridViewCellStyle1.ForeColor = Color.Black;
+            dataGridViewResults.RowsDefaultCellStyle = dataGridViewCellStyle1;
             dataGridViewResults.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dataGridViewResults.Size = new Size(1184, 451);
             dataGridViewResults.TabIndex = 3;
