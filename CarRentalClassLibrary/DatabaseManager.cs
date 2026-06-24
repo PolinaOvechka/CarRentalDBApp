@@ -340,7 +340,7 @@ namespace CarRentalClassLibrary
         }
 
         /// <summary>
-        /// Получить правильное имя поля для поиска в таблице с JOIN
+        /// Получить правильное имя поля для поиска в таблице
         /// </summary>
         private string GetSearchConditionForExtendedTable(string tableName, string displayFieldName, string searchValue)
         {
@@ -422,7 +422,7 @@ namespace CarRentalClassLibrary
         }
 
         // ============================================
-        // CRUD ОПЕРАЦИИ (СОЗДАНИЕ, ЧТЕНИЕ, ОБНОВЛЕНИЕ, УДАЛЕНИЕ)
+        // СОЗДАНИЕ, ЧТЕНИЕ, ОБНОВЛЕНИЕ, УДАЛЕНИЕ
         // ============================================
 
         /// <summary>
@@ -462,17 +462,17 @@ namespace CarRentalClassLibrary
 
                     if (kvp.Value.StartsWith("#") && kvp.Value.EndsWith("#"))
                     {
-                        // Дата в формате Access #dd.mm.yyyy#
+                        // Дата
                         values.Add(kvp.Value);
                     }
                     else if (IsNumericValue(kvp.Value))
                     {
-                        // Число - добавляем без кавычек
+                        // Число
                         values.Add(kvp.Value);
                     }
                     else
                     {
-                        // Строка - экранируем одинарные кавычки
+                        // Строка
                         string escapedValue = kvp.Value.Replace("'", "''");
                         values.Add("'" + escapedValue + "'");
                     }
@@ -519,7 +519,7 @@ namespace CarRentalClassLibrary
                     }
                     else
                     {
-                        // Строка - экранируем кавычки
+                        // Строка
                         value = "'" + kvp.Value.Replace("'", "''") + "'";
                     }
 
